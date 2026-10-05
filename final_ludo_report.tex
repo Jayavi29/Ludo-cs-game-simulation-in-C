@@ -1,0 +1,266 @@
+\documentclass[11pt,a4paper]{article}
+
+% ---------- Packages ----------
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{parskip}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage[hidelinks]{hyperref}
+
+% ---------- Code listing style ----------
+\lstdefinestyle{cstyle}{
+  language=C,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue!70!black}\bfseries,
+  commentstyle=\color{green!50!black}\itshape,
+  stringstyle=\color{red!60!black},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  frame=single,
+  rulecolor=\color{gray!50},
+  backgroundcolor=\color{gray!5},
+  breaklines=true,
+  tabsize=4,
+  showstringspaces=false,
+  xleftmargin=1.5em,
+  framexleftmargin=1.5em
+}
+\lstset{style=cstyle}
+
+\newcommand{\code}[1]{\texttt{#1}}
+
+\title{\textbf{Ludo Game Report}}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+% =====================================================================
+\section{Data Structures Used to Represent Players and Pieces}
+
+\subsection{Piece Structure}
+
+Each piece is represented by a structure containing three variables.
+
+\begin{lstlisting}
+typedef struct {
+    short location;
+    short index;
+    short captureCounter;
+} piece;
+\end{lstlisting}
+
+\begin{description}[style=nextline, leftmargin=1.5em]
+  \item[\code{location}]
+    This attribute is central to the piece's state within the game. It encodes
+    the entire position logic of the piece, which can take the following values:
+    \begin{itemize}[nosep]
+      \item $-2$: the piece is in the base.
+      \item $-1$: the piece has reached home.
+      \item $0$ to $51$: positions on the standard path.
+      \item $-10$ to $-5$: positions in the home straight.
+    \end{itemize}
+
+  \item[\code{index}]
+    Identifies the piece among the four pieces belonging to the player, allowing
+    easy access to and manipulation of a specific piece when needed.
+
+  \item[\code{captureCounter}]
+    Keeps track of how many captures the piece has made. This information is
+    required when determining whether the piece can enter the home straight.
+\end{description}
+
+\subsection{Player Structure}
+
+Each player is represented by a structure containing seven variables.
+
+\begin{lstlisting}
+typedef struct {
+    char  color[7];
+    piece Piece[NUM_OF_PIECES];
+    short piecesInPath;
+    short piecesInBase;
+    short piecesInHome;
+    short startingPosition;
+    short homeStraightEntery;
+} player;
+\end{lstlisting}
+
+\begin{description}[style=nextline, leftmargin=1.5em]
+  \item[\code{color}]
+    Represents the colour of the player's pieces.
+
+  \item[\code{Piece}]
+    An array holding the four pieces that belong to the player. Each element is
+    an instance of the \code{piece} structure, allowing each piece's state to be
+    managed individually.
+
+  \item[\code{piecesInPath}]
+    Tracks the number of pieces currently on the standard path, which helps in
+    choosing which piece to move.
+
+  \item[\code{piecesInBase}]
+    Tracks how many pieces are still in the base.
+
+  \item[\code{piecesInHome}]
+    Counts how many pieces have reached home, which is essential for determining
+    when a player has finished the game.
+
+  \item[\code{startingPosition}]
+    Represents each player's starting cell, so that the structure can be
+    generalised without considering which player is currently playing.
+
+  \item[\code{homeStraightEntery}]
+    Represents each player's approach cell, again allowing the player structure
+    to be generalised without considering which player is currently playing.
+\end{description}
+
+\subsection{Justification for the Chosen Structures}
+
+The \code{player} structure encapsulates all attributes that define a player's
+state, making it easy to manage each player's pieces collectively. The nested
+\code{piece} array, in turn, allows each piece of a particular player to be
+accessed and updated separately.
+
+By maintaining counts of pieces in each state (\code{piecesInPath},
+\code{piecesInBase}, \code{piecesInHome}), the structure enables quick checks
+and updates without repeatedly iterating over the pieces array. In addition, by
+associating each player with a starting position and a home-straight entry
+cell, the same logic can be applied to every player, which keeps the code
+general.
+
+% =====================================================================
+\section{Function Justification and Code Efficiency}
+
+\begin{enumerate}[label=\arabic*.,leftmargin=*,itemsep=0.8em]
+
+  \item \code{diceRoll()}
+  \begin{itemize}[nosep]
+    \item Generates a random number between 1 and 6, simulating a dice roll.
+    \item \textbf{Efficiency:} $O(1)$.
+  \end{itemize}
+
+  \item \code{nextplayer(int currentPlayer)}
+  \begin{itemize}[nosep]
+    \item Determines the next player in sequence, ensuring the game progresses
+          in cyclic order (Red $\rightarrow$ Green $\rightarrow$ Yellow
+          $\rightarrow$ Blue).
+    \item \textbf{Efficiency:} $O(1)$.
+  \end{itemize}
+
+  \item \code{InitializePlayer()}
+  \begin{itemize}[nosep]
+    \item Initialises the properties of each player, including their pieces
+          and starting positions.
+    \item \textbf{Efficiency:} $O(n^2)$. However, this function is called only
+          once per game, so it does not affect overall efficiency.
+  \end{itemize}
+
+  \item \code{EligibleToHomeStraight(int currentPosition,}\newline\hspace*{1.5em}\code{int expectedLocation, int currentPlayer)}
+  \begin{itemize}[nosep]
+    \item Iterates from the current position to the expected location of a
+          piece (\code{expectedLocation = currentPosition + diceRoll}) to
+          determine whether the player's approach cell is passed during the
+          move. If so, the piece enters the home straight instead of continuing
+          along the standard path.
+    \item \textbf{Efficiency:} $O(1)$, since the number of steps is bounded by
+          the dice value.
+  \end{itemize}
+
+  \item \code{getPiecesInPath(int p, int pathPieces[])}
+  \begin{itemize}[nosep]
+    \item Returns an array containing the indexes of the pieces currently on
+          the standard path. This is required to decide which piece to move
+          when more than one piece is on the path. It is also used to identify
+          which pieces are in the base, so that a piece can be moved to the
+          starting cell when a 6 is rolled.
+    \item \textbf{Efficiency:} $O(n)$.
+  \end{itemize}
+
+  \item \code{positionMaker(int index, int player, int new\_position)}
+  \begin{itemize}[nosep]
+    \item Sets the location of a piece that is about to enter the home
+          straight from the standard path.
+    \item \textbf{Efficiency:} $O(1)$.
+  \end{itemize}
+
+  \item \code{updatePosition(int p)}
+  \begin{itemize}[nosep]
+    \item Iterates through each piece of the given player and recalculates the
+          number of pieces in the base, on the path, and at home. This ensures
+          that the game state remains accurate after every move.
+    \item \textbf{Efficiency:} $O(n)$.
+  \end{itemize}
+
+  \item \code{isCapture(int currentPlayer,}\newline\hspace*{1.5em}\code{int *capturedPlayer, int *capturedPiece)}
+  \begin{itemize}[nosep]
+    \item Takes the index of the current player so that only the pieces of the
+          other three players are checked for capture. It also takes two
+          pointers, to which it assigns the player index and piece index of the
+          captured piece. This identifies which piece of which player must be
+          returned to the base.
+    \item \textbf{Efficiency:} $O(n^2)$.
+  \end{itemize}
+
+  \item \code{reset(int capturedPlayer, int capturedPiece)}
+  \begin{itemize}[nosep]
+    \item Called after a capture to return the captured piece to the base of
+          its player.
+    \item \textbf{Efficiency:} $O(1)$.
+  \end{itemize}
+
+  \item \code{movePiece(int currentPlayer, int roll)}
+  \begin{itemize}[nosep]
+    \item Handles all movement logic based on the dice roll, including
+          capturing and entering the home straight. Encapsulating all
+          movement-related logic in one function keeps the code modular and
+          easy to maintain.
+    \item \textbf{Efficiency:} $O(n^2)$, as it must check multiple conditions.
+  \end{itemize}
+
+  \item \code{playGame(int firstPlayer)}
+  \begin{itemize}[nosep]
+    \item Takes the index of the starting player, which is determined in
+          \code{main}. This is the central function that drives the game,
+          controlling the flow of turns and checking for a winner.
+    \item \textbf{Efficiency:} The main loop runs until a winner is found, so
+          its running time depends on the progress of the game.
+  \end{itemize}
+
+\end{enumerate}
+
+% =====================================================================
+\section{Summary of Time Complexities}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{>{\ttfamily}l l}
+\toprule
+\textrm{\textbf{Function}} & \textbf{Time Complexity} \\
+\midrule
+diceRoll               & $O(1)$ \\
+nextplayer             & $O(1)$ \\
+InitializePlayer       & $O(n^2)$ (called once) \\
+EligibleToHomeStraight & $O(1)$ \\
+getPiecesInPath        & $O(n)$ \\
+positionMaker          & $O(1)$ \\
+updatePosition         & $O(n)$ \\
+isCapture              & $O(n^2)$ \\
+reset                  & $O(1)$ \\
+movePiece              & $O(n^2)$ \\
+playGame               & Depends on game progress \\
+\bottomrule
+\end{tabular}
+\caption{Time complexity of each function.}
+\end{table}
+
+\end{document}
